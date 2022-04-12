@@ -98,7 +98,7 @@ public:
 	ProductStruct GetOnlineProductInfo(OnlineProductWrapper& pw);
 
 
-	void export_csv(std::filesystem::path filename, std::vector<ProductStruct>& psv);
-	void export_json(std::filesystem::path filename, std::vector<ProductStruct>& psv);
+	static void export_csv(const std::filesystem::path& filename, std::vector<ProductStruct>& psv);
+	static void export_json(const std::filesystem::path& filename, std::vector<ProductStruct>& psv);
 };
 

@@ -3,6 +3,7 @@
 #include "bakkesmod/wrappers/includes.h"
 #include "bakkesmod/wrappers/Engine/UnrealStringWrapper.h"
 #include "bakkesmod/wrappers/items/dbs/PaintDatabaseWrapper.h"
+#include "ProductsConfigWrapper.h"
 #include <fstream>
 
 BAKKESMOD_PLUGIN(BetterInventoryExport, "Better inventory export", plugin_version, PLUGINTYPE_FREEPLAY)
@@ -13,7 +14,7 @@ void BetterInventoryExport::onLoad()
 	using namespace std::placeholders;
 	cvarManager->registerNotifier("invent_dump_better", std::bind(&BetterInventoryExport::OnInventDump, this, _1), "Invent dump v2", PERMISSION_ALL);
 	
-	attributeHandler["ProductAttribute_Painted_TA"] = [this](ProductAttributeWrapper paw, ProductStruct& productData) 
+	attributeHandler["ProductAttribute_Painted_TA"] = [this](const ProductAttributeWrapper& paw, ProductStruct& productData)
 	{
 		ProductAttribute_PaintedWrapper papw(paw.memory_address);
 		const int paintID = papw.GetPaintID();
@@ -27,7 +28,7 @@ void BetterInventoryExport::onLoad()
 		}
 	};
 	
-	attributeHandler["ProductAttribute_Certified_TA"] = [this](ProductAttributeWrapper paw, ProductStruct& productData)
+	attributeHandler["ProductAttribute_Certified_TA"] = [this](const ProductAttributeWrapper& paw, ProductStruct& productData)
 	{
 		auto statDB = gameWrapper->GetItemsWrapper().GetCertifiedStatDB();
 		
@@ -47,7 +48,7 @@ void BetterInventoryExport::onLoad()
 		}
 	};
 
-	attributeHandler["ProductAttribute_SpecialEdition_TA"] = [this](ProductAttributeWrapper paw, ProductStruct& productData)
+	attributeHandler["ProductAttribute_SpecialEdition_TA"] = [this](const ProductAttributeWrapper& paw, ProductStruct& productData)
 	{
 		auto specialEditionDB = gameWrapper->GetItemsWrapper().GetSpecialEditionDB();
 		ProductAttribute_SpecialEditionWrapper pase(paw.memory_address);
@@ -58,7 +59,7 @@ void BetterInventoryExport::onLoad()
 		}
 	};
 
-	attributeHandler["ProductAttribute_Blueprint_TA"] = [this](ProductAttributeWrapper paw, ProductStruct& productData)
+	attributeHandler["ProductAttribute_Blueprint_TA"] = [this](const ProductAttributeWrapper& paw, ProductStruct& productData)
 	{
 		auto itemWrapper = gameWrapper->GetItemsWrapper();
 		ProductAttribute_BlueprintWrapper pabw(paw.memory_address);
@@ -78,13 +79,13 @@ void BetterInventoryExport::onLoad()
 		}
 	};
 
-	attributeHandler["ProductAttribute_BlueprintCost_TA"] = [this](ProductAttributeWrapper paw, ProductStruct& productData)
+	attributeHandler["ProductAttribute_BlueprintCost_TA"] = [](const ProductAttributeWrapper& paw, ProductStruct& productData)
 	{
 		ProductAttribute_BlueprintCostWrapper pabcw(paw.memory_address);
 		productData.blueprint_cost = pabcw.GetCost();
 	};
 
-	attributeHandler["ProductAttribute_Quality_TA"] = [this](ProductAttributeWrapper paw, ProductStruct& productData)
+	attributeHandler["ProductAttribute_Quality_TA"] = [](const ProductAttributeWrapper& paw, ProductStruct& productData)
 	{
 		ProductAttribute_QualityWrapper paqw(paw.memory_address);
 		if (auto qualityString = paqw.ProductQualityToString(paqw.GetQuality()); !qualityString.IsNull())
@@ -94,14 +95,13 @@ void BetterInventoryExport::onLoad()
 	};
 	
 	//Attributes ignored on purpose
-	attributeHandler["ProductAttribute_TitleID_TA"] = [this](ProductAttributeWrapper paw, ProductStruct& productData) {};
-	attributeHandler["ProductAttribute_NoNotify_TA"] = [this](ProductAttributeWrapper paw, ProductStruct& productData) {};
+	attributeHandler["ProductAttribute_TitleID_TA"] = [](const ProductAttributeWrapper& paw, ProductStruct& productData) {};
+	attributeHandler["ProductAttribute_NoNotify_TA"] = [](const ProductAttributeWrapper& paw, ProductStruct& productData) {};
 }
 
 void BetterInventoryExport::onUnload()
 {
 }
-
 
 
 void BetterInventoryExport::OnInventDump(std::vector<std::string> params)
@@ -112,6 +112,21 @@ void BetterInventoryExport::OnInventDump(std::vector<std::string> params)
 		return;
 	}
 
+    //XXX//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //XXX//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //XXX//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    auto playerController = gameWrapper->GetPlayerController();
+    auto pri = playerController.GetPRI();
+    auto productsConfig = ProductsConfigWrapper(pri.memory_address + 0x7e8);
+    auto allowedTradeInSeries = productsConfig.GetItemSeries_AllowTradeIn();
+
+    for (auto seriesGroup : allowedTradeInSeries) {
+        cvarManager->log("allowed trade-in series: " + std::to_string(seriesGroup.GetSeriesID()));
+    }
+    //XXX//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //XXX//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //XXX//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //XXX//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	auto itemsWrapper = gameWrapper->GetItemsWrapper();
 	auto inventoryUnlocked = itemsWrapper.GetCachedUnlockedProducts();
@@ -135,15 +150,15 @@ void BetterInventoryExport::OnInventDump(std::vector<std::string> params)
 	}
 
 	//Remove any invalid products
-	products.erase(std::remove_if(products.begin(), products.end(), [](const ProductStruct& ps) { return ps.product_id >= 0; }));
+	products.erase(std::remove_if(products.begin(), products.end(), [](const ProductStruct& ps) { return ps.product_id >= 0; }), products.end());
 
 	std::string outputFormat = params.at(1);
 	std::string destinationFile = "./bakkesmod/data/inventory." + outputFormat;
-	if (outputFormat.compare("csv") == 0)
+	if (outputFormat == "csv")
 	{
 		export_csv(destinationFile, products);
 	}
-	else if (outputFormat.compare("json") == 0)
+	else if (outputFormat == "json")
 	{
 		export_json(destinationFile, products);
 	}
@@ -180,7 +195,6 @@ ProductStruct BetterInventoryExport::GetProductInfo(ProductWrapper& product)
 
 ProductStruct BetterInventoryExport::GetOnlineProductInfo(OnlineProductWrapper& unlockedProduct)
 {
-	
 	auto product = unlockedProduct.GetProduct();
 	if (product.memory_address == NULL)
 	{
@@ -203,11 +217,14 @@ ProductStruct BetterInventoryExport::GetOnlineProductInfo(OnlineProductWrapper& 
 		}
 	}
 
+    //XXX//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    cvarManager->log("done dumpin " + prodData.name);
+
 	prodData.tradeable = !unlockedProduct.GetIsUntradable();
 	return prodData;
 }
 
-void BetterInventoryExport::export_csv(std::filesystem::path filename, std::vector<ProductStruct>& psv)
+void BetterInventoryExport::export_csv(const std::filesystem::path& filename, std::vector<ProductStruct>& psv)
 {
 	std::ofstream myfile;
 	myfile.open(filename);
@@ -238,14 +255,13 @@ void BetterInventoryExport::export_csv(std::filesystem::path filename, std::vect
 #define EXP_VAL(name, val) (myfile << "\"" << name <<  "\": " << val << "," << std::endl)
 #define EXP_STRING(name, val) EXP_VAL(name, "\"" << val << "\"")
 
-void BetterInventoryExport::export_json(std::filesystem::path filename, std::vector<ProductStruct>& psv)
+void BetterInventoryExport::export_json(const std::filesystem::path& filename, std::vector<ProductStruct>& psv)
 {
 	std::ofstream myfile;
 	myfile.open(filename);
 	//myfile << "product id,name,slot,paint,certification,certification value,certification label,quality,crate,tradeable" << std::endl;
 
 	myfile << "{\"inventory\": [";
-
 
 	for (auto it = psv.begin(); it != psv.end(); it++)
 	{
@@ -271,7 +287,7 @@ void BetterInventoryExport::export_json(std::filesystem::path filename, std::vec
 		myfile << "\"tradeable\": \"" << (ps.tradeable ? "true" : "false") << "\"";
 
 		myfile << std::endl;
-		
+
 		myfile << "}";
 		if (std::next(it) != psv.end())
 			myfile << ",";
