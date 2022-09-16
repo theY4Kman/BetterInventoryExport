@@ -1,7 +1,3 @@
-//
-// Created by they4kman on 4/11/22.
-//
-
 #include "SeriesGroupWrapper.h"
 
 int32_t SeriesGroupWrapper::GetSeriesID() {

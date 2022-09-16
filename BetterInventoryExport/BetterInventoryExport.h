@@ -3,7 +3,7 @@
 #include "bakkesmod/plugin/bakkesmodplugin.h"
 #include <filesystem>
 
-constexpr auto plugin_version = "1.0";
+constexpr auto plugin_version = "1.0-yak";
 
 enum class ProductQuality : uint8_t
 {
@@ -28,20 +28,22 @@ struct ProductQualityInfo
 struct ProductStruct
 {
 	int product_id = 0;
-	std::string name = "";
-	std::string slot = "";
+	std::string name;
+	std::string slot;
 	std::string paint = "none";
 	std::string certification = "none";
 	int certification_value = 0;
 	std::string rank_label = "none";
 	std::string special_edition = "none";
 	std::string quality = "unknown";
-	std::string crate = "";
+	std::string crate;
+    int series_id = 0;
+	std::string series;
 	unsigned long long instance_id = 0;
-	bool tradeable = 0;
-	
+	bool tradeable = false;
+
 	int blueprint_item_id = 0;
-	std::string blueprint_item = "";
+	std::string blueprint_item;
 	int blueprint_cost = 0;
 
 	int amount = 1;
@@ -98,7 +100,7 @@ public:
 	ProductStruct GetOnlineProductInfo(OnlineProductWrapper& pw);
 
 
-	static void export_csv(const std::filesystem::path& filename, std::vector<ProductStruct>& psv);
-	static void export_json(const std::filesystem::path& filename, std::vector<ProductStruct>& psv);
+	void export_csv(const std::filesystem::path& filename, std::vector<ProductStruct>& psv);
+	void export_json(const std::filesystem::path& filename, std::vector<ProductStruct>& psv);
 };
 
